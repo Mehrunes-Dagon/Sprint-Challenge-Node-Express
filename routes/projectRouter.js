@@ -2,87 +2,107 @@ const express = require('express');
 const router = express.Router();
 const db = require('../data/helpers/projectModel.js');
 
-router.get('/', (req, res) => {
+router.get("/", (req, res) => {
   db
     .get()
-    .then(users => {
-      res.status(200).json(users);
+    .then(projects => {
+      res.status(200).json(projects);
     })
     .catch(error => {
-      res.status(500).json(error);
+      res.status(500).json({ error: "Fetch failed" });
     });
 });
 
-router.get('/:id', (req, res) => {
+router.get("/:id", (req, res) => {
   const { id } = req.params;
 
   db
-    .findById(id)
-    .then(posts => {
-      res.json(posts[0]);
+    .get(id)
+    .then(project => {
+      res.status(200).json(project);
     })
     .catch(error => {
-      res.status(500).json(error);
+      res
+        .status(500)
+        .json({ error: `Project ${id} fetch failed` });
     });
 });
 
-router.post('/', (req, res) => {
-  const post = req.body;
-
-  db
-    .insert(post)
-    .then(response => {
-      res.status(201).json(response);
-    })
-    .catch(error => {
-      res.status(500).json({
-        error: 'There was an error while saving the post to the database',
-      });
-    });
-});
-
-router.delete('/:id', (req, res) => {
+router.get("/:id/actions", (req, res) => {
   const { id } = req.params;
-  let post;
 
   db
-    .findById(id)
-    .then(response => {
-      post = { ...response[0] };
-
-      db
-        .remove(id)
-        .then(response => {
-          res.status(200).json(post);
-        })
-        .catch(error => {
-          res.status(500).json(error);
-        });
+    .getProjectActions(id)
+    .then(actions => {
+      res.status(200).json(actions);
     })
     .catch(error => {
-      res.status(500).json(error);
+      res
+        .status(500)
+        .json({ error: "Action fetch failed" });
     });
 });
 
-router.put('/:id', (req, res) => {
-  const { id } = req.params;
-  const update = req.body;
+router.post("/", (req, res) => {
+  const project = req.body;
+
+  if (!project.name || !project.description) {
+    res.status(400).json({
+      errorMessage: "Missing field(s)",
+    });
+    return;
+  }
+
+  if (project.name.length > 128 || project.description.length > 128) {
+    res.status(400).json({
+      errorMessage:
+        "Must be under 128 characters",
+    });
+    return;
+  }
 
   db
-    .update(id, update)
-    .then(count => {
-      if (count > 0) {
-        db.findById(id).then(updatedPosts => {
-          res.status(200).json(updatedPosts[0]);
+    .insert(project)
+    .then(id => {
+      res.status(201).json(project);
+    })
+    .catch(error => {
+      res.status(500).json({ error: "Post failed" });
+    });
+});
+
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+  db
+    .remove(id)
+    .then(project => {
+      if (project > 0) {
+        res.status(200).json({
+          message: `Deleted project ${id}`,
         });
       } else {
-        res
-          .status(404)
-          .json({ message: 'The post with the specified ID does not exist.' });
+        res.status(404).json({ error: `Project ${id} not found` });
       }
     })
     .catch(error => {
-      res.status(500).json(error);
+      res.status(500).json({ error: "Fetch failed" });
+    });
+});
+
+router.put("/:id", (req, res) => {
+  const { id } = req.params;
+  const updatedProject = req.body;
+
+  db
+    .update(id, updatedProject)
+    .then(updates => {
+      res.status(200).json({
+        message: `Updated project ${id}`,
+        updatedProject,
+      });
+    })
+    .catch(error => {
+      res.status(500).json({ error: "Update failed" });
     });
 });
 
